@@ -1,7 +1,7 @@
 extern crate getopts;
 extern crate env_logger;
 extern crate libc;
-
+extern crate reqwest;
 #[macro_use]
 extern crate log;
 
@@ -13,9 +13,10 @@ use std::process::{exit, Command};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::{env, mem};
-
+use std::io;
+use std::fs;
 use getopts::Options;
-
+use std::path::Path;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
@@ -36,6 +37,12 @@ fn main() {
     env_logger::init();
 
     parse_args();
+    println!("{}", VERSION);
+    // if dataset is not downloaded, download it
+    if dataset_downloaded() == false {
+        println!("Downloading dataset...");
+        download_and_extract_dataset();
+    }
 
 
     // TODO: use the sizeof function (not available yet) instead of hard-coding 24.
@@ -133,4 +140,51 @@ fn get_keyboard_device_filenames() -> Vec<String> {
         filenames.push(filename);
     }
     filenames
+}
+
+fn dataset_downloaded() -> bool{
+    // check if the folder Lexique383 exist
+    if Path::new("./Lexique383").exists() {
+        return true;
+    }else{
+        return false;
+    }
+
+}
+
+fn download_file(url: &str, path: &str) {
+    let wget_cmd = format!("wget -O {} {}", path, url);
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c").arg(wget_cmd);
+    let output = cmd.output().expect("failed to execute process");
+    if !output.status.success() {
+        panic!("{}", String::from_utf8_lossy(&output.stderr));
+    }
+
+}
+
+fn download_and_extract_dataset(){
+    // http://www.lexique.org/databases/Lexique383/Lexique383.zip
+
+    download_file("http://www.lexique.org/databases/Lexique383/Lexique383.zip", "./Lexique383.zip");
+
+
+
+    // extract the zip file
+    let mut zip = zip::ZipArchive::new(File::open("Lexique383.zip").unwrap())
+        .unwrap_or_else(|e| panic!("{}", e));
+    
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i).unwrap();
+        let outpath = Path::new(file.name());
+        let outpath = Path::new("./Lexique383").join(outpath);
+        if let Some(parent) = outpath.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).unwrap();
+            }
+        }
+        let mut outfile = File::create(outpath).unwrap();
+        io::copy(&mut file, &mut outfile).unwrap();
+    }
+
 }
