@@ -44,6 +44,9 @@ fn main() {
         download_and_extract_dataset();
     }
 
+    let dataset = load_dataset();
+    println!("Dataset loaded");
+    println!("test : {:?}", search_partial_dataset("salu", &dataset));
 
     // TODO: use the sizeof function (not available yet) instead of hard-coding 24.
     let buf: [u8; 24] = unsafe { mem::zeroed() };
@@ -73,6 +76,8 @@ fn main() {
         }
     }
 }
+
+
 
 fn root_check() {
     let euid = unsafe { libc::geteuid() };
@@ -140,6 +145,54 @@ fn get_keyboard_device_filenames() -> Vec<String> {
         filenames.push(filename);
     }
     filenames
+}
+
+fn load_dataset() ->  Vec<Vec<(String,String)>> {
+    // return a vector of vector of string
+    // type : Vec<Vec<String>>
+    // tsv file
+    let mut file = File::open("Lexique383/Lexique383.tsv").unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    let mut lines = contents.lines();
+    let mut dataset = Vec::new();
+    let mut labels = Vec::new();
+    // first line is the labels
+    let labels_str = lines.next().unwrap();
+    for label in labels_str.split('\t') {
+        labels.push(label.to_string());
+    }
+    // rest of the lines are the dataset
+    for line in lines {
+        let mut line_vec : Vec<(String,String)> = Vec::new();
+        let mut i = 0;
+        for word in line.split('\t') {
+            let label = labels[i].clone();
+            line_vec.push((label, word.to_string()));
+            i += 1;
+        }
+        dataset.push(line_vec);
+    }
+    dataset
+
+}
+
+fn search_partial_dataset(partial_word: &str, dataset: &Vec<Vec<(String,String)>>) -> Vec<String> {
+    let mut result = Vec::new();
+    for line in dataset {
+        if line[0].1.to_lowercase().contains(partial_word.to_lowercase().as_str()) {
+            result.push((line[0].1.to_string(), line[6].1.to_string()));
+        }
+    }
+    // shorting the result by label 6
+    result.sort_by(|a, b| a.1.cmp(&b.1));
+    // remove label 6
+    let mut result_short = Vec::new();
+    for line in result {
+        result_short.push(line.0);
+    }
+    result_short
+
 }
 
 fn dataset_downloaded() -> bool{
