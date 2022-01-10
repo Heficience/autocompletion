@@ -16,7 +16,10 @@ use std::{env, mem};
 use std::io;
 use std::fs;
 use getopts::Options;
+use serde::Deserialize;
+
 use std::path::Path;
+use csv;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
@@ -31,6 +34,16 @@ impl Config {
     }
 }
 
+#[derive(Debug,Deserialize)]
+struct Record {
+    ortho: String,
+    freqlemfilms2: f64,
+    freqlemlivres: f64,
+    freqfilms2: f64,
+    freqlivres: f64,
+}
+
+
 fn main() {
     root_check();
 
@@ -41,12 +54,13 @@ fn main() {
     // if dataset is not downloaded, download it
     if dataset_downloaded() == false {
         println!("Downloading dataset...");
-        download_and_extract_dataset();
+        download_file("https://github.com/Heficience/autocompletion/raw/master/Lexique383.csv", "./Lexique383.csv");
     }
+
 
     let dataset = load_dataset();
     println!("Dataset loaded");
-    println!("test : {:?}", search_partial_dataset("salu", &dataset));
+    println!("dataset (first 5 words) : {:?}", dataset.get(0..5));
 
     // TODO: use the sizeof function (not available yet) instead of hard-coding 24.
     let buf: [u8; 24] = unsafe { mem::zeroed() };
@@ -61,11 +75,13 @@ fn main() {
                     shift_pressed += 1;
                 }
 
-                let text = get_key_text(event.code, shift_pressed).as_bytes();
+                let text = get_key_text(event.code, shift_pressed).to_string();
 
                 // Ici on pourra commencer a predire le texte 
                 // On pourra utiliser le texte pour faire des predictions
                 
+                let predictions = search_partial_dataset(&text, &dataset);
+                println!("{:?}", predictions);
                 println!("{:?}",KEY_NAMES[event.code as usize]);
                
             } else if is_key_release(event.value) {
@@ -147,57 +163,44 @@ fn get_keyboard_device_filenames() -> Vec<String> {
     filenames
 }
 
-fn load_dataset() ->  Vec<Vec<(String,String)>> {
-    // return a vector of vector of string
-    // type : Vec<Vec<String>>
-    // tsv file
-    let mut file = File::open("Lexique383/Lexique383.tsv").unwrap();
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
-    let mut lines = contents.lines();
+fn load_dataset() -> Vec<(String, String)> {
     let mut dataset = Vec::new();
-    let mut labels = Vec::new();
-    // first line is the labels
-    let labels_str = lines.next().unwrap();
-    for label in labels_str.split('\t') {
-        labels.push(label.to_string());
-    }
-    // rest of the lines are the dataset
-    for line in lines {
-        let mut line_vec : Vec<(String,String)> = Vec::new();
-        let mut i = 0;
-        for word in line.split('\t') {
-            let label = labels[i].clone();
-            line_vec.push((label, word.to_string()));
-            i += 1;
-        }
-        dataset.push(line_vec);
+    let mut reader = csv::Reader::from_path("./Lexique383.csv").unwrap();   
+    
+    for record in reader.deserialize() {
+        let record: Record = record.unwrap();
+        println!("{:?}", record);
+        // create moyenne frequency with for 1-4 attributs (float)
+        let moyenne_frequency = 0;
+
+        dataset.push((record.ortho, moyenne_frequency.to_string()));
     }
     dataset
-
 }
 
-fn search_partial_dataset(partial_word: &str, dataset: &Vec<Vec<(String,String)>>) -> Vec<String> {
+fn search_partial_dataset(partial_word: &str, dataset: &Vec<(String, String)>) -> Vec<String> {
     let mut result = Vec::new();
-    for line in dataset {
-        if line[0].1.to_lowercase().contains(partial_word.to_lowercase().as_str()) {
-            result.push((line[0].1.to_string(), line[6].1.to_string()));
+
+    for (word, _) in dataset {
+        if word.starts_with(partial_word) {
+            result.push(word.clone());
         }
     }
-    // shorting the result by label 6
-    result.sort_by(|a, b| a.1.cmp(&b.1));
-    // remove label 6
-    let mut result_short = Vec::new();
-    for line in result {
-        result_short.push(line.0);
-    }
-    result_short
+
+    // short by moyenne frequency (column 2)
+    result.sort_by(|a, b| {
+        let a_moyenne = a.split(",").nth(2).unwrap().parse::<f32>().unwrap();
+        let b_moyenne = b.split(",").nth(2).unwrap().parse::<f32>().unwrap();
+        a_moyenne.partial_cmp(&b_moyenne).unwrap()
+    });
+
+    result
 
 }
 
 fn dataset_downloaded() -> bool{
     // check if the folder Lexique383 exist
-    if Path::new("./Lexique383").exists() {
+    if Path::new("Lexique383.csv").exists() {
         return true;
     }else{
         return false;
@@ -216,28 +219,3 @@ fn download_file(url: &str, path: &str) {
 
 }
 
-fn download_and_extract_dataset(){
-    // http://www.lexique.org/databases/Lexique383/Lexique383.zip
-
-    download_file("http://www.lexique.org/databases/Lexique383/Lexique383.zip", "./Lexique383.zip");
-
-
-
-    // extract the zip file
-    let mut zip = zip::ZipArchive::new(File::open("Lexique383.zip").unwrap())
-        .unwrap_or_else(|e| panic!("{}", e));
-    
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
-        let outpath = Path::new(file.name());
-        let outpath = Path::new("./Lexique383").join(outpath);
-        if let Some(parent) = outpath.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).unwrap();
-            }
-        }
-        let mut outfile = File::create(outpath).unwrap();
-        io::copy(&mut file, &mut outfile).unwrap();
-    }
-
-}

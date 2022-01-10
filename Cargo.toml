@@ -12,3 +12,5 @@ env_logger = "*"
 log = "*"
 reqwest = "*"
 zip = "*"
+csv = "*"
+serde = { version = "*", features = ["derive"] }
