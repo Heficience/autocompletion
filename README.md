@@ -4,7 +4,9 @@
 
 ### Installation
 ```bash
-# Bientôt
+# Lib:
+sudo apt install libx11-dev libxdo-dev -y
+
 ```
 
 ### Contributions
@@ -12,5 +14,4 @@
 
 
 ### Remerciements
-- [Projet KeyLogger](https://github.com/gsingh93/keylogger/) pour avoir l'idée de l'utilisation des evenements du clavier.
 - [Rust](https://rust-lang.com/) est le langage de programmation utilisé pour ce projet.

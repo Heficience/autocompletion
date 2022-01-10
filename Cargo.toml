@@ -13,4 +13,5 @@ log = "*"
 reqwest = "*"
 zip = "*"
 csv = "*"
-serde = { version = "*", features = ["derive"] }
+device_query = "*"
+enigo = "*"

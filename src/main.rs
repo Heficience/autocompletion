@@ -2,54 +2,22 @@ extern crate getopts;
 extern crate env_logger;
 extern crate libc;
 extern crate reqwest;
-#[macro_use]
 extern crate log;
+use std::process::{Command};
+use std::{env};
 
-mod input;
+use device_query::{DeviceQuery, DeviceState};
 
-use input::{is_key_event, is_key_press, is_key_release, is_shift, get_key_text, InputEvent, KEY_NAMES};
-
-use std::process::{exit, Command};
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use std::{env, mem};
-use std::io;
-use std::fs;
-use getopts::Options;
-use serde::Deserialize;
 
 use std::path::Path;
 use csv;
+use enigo::{Enigo, KeyboardControllable};
+
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
-#[derive(Debug)]
-struct Config {
-    device_file: String,
-    log_file: String
-}
-
-impl Config {
-    fn new(device_file: String, log_file: String) -> Self {
-        Config { device_file: device_file, log_file: log_file }
-    }
-}
-
-#[derive(Debug,Deserialize)]
-struct Record {
-    ortho: String,
-    freqlemfilms2: f64,
-    freqlemlivres: f64,
-    freqfilms2: f64,
-    freqlivres: f64,
-}
 
 
 fn main() {
     root_check();
-
-    env_logger::init();
-
-    parse_args();
     println!("{}", VERSION);
     // if dataset is not downloaded, download it
     if dataset_downloaded() == false {
@@ -61,37 +29,59 @@ fn main() {
     let dataset = load_dataset();
     println!("Dataset loaded");
     println!("dataset (first 5 words) : {:?}", dataset.get(0..5));
+    println!("dataset search for 'salu' {:?}", search_partial_dataset("salu", &dataset, &10));
 
-    // TODO: use the sizeof function (not available yet) instead of hard-coding 24.
-    let buf: [u8; 24] = unsafe { mem::zeroed() };
-
-    let mut shift_pressed = 0;
+    let device_state = DeviceState::new();
+    let mut prev_keys = vec![];
+    let mut word = String::new();
+    let mut client_enigo = Enigo::new();
+    
     loop {
-  
-        let event: InputEvent = unsafe { mem::transmute(buf) };
-        if is_key_event(event.type_) {
-            if is_key_press(event.value) {
-                if is_shift(event.code) {
-                    shift_pressed += 1;
-                }
 
-                let text = get_key_text(event.code, shift_pressed).to_string();
-
-                // Ici on pourra commencer a predire le texte 
-                // On pourra utiliser le texte pour faire des predictions
-                
-                let predictions = search_partial_dataset(&text, &dataset);
-                println!("{:?}", predictions);
-                println!("{:?}",KEY_NAMES[event.code as usize]);
-               
-            } else if is_key_release(event.value) {
-                if is_shift(event.code) {
-                    shift_pressed -= 1;
+        let keys = device_state.get_keys();
+        if keys != prev_keys && !keys.is_empty() {
+            // if space is pressed, clear the word [Space]
+            if keys[0].to_string() == "Space" {
+                word.clear();
+            }
+            // if backspace is pressed, remove the last char [Backspace]
+            else if keys[0].to_string() == "Backspace" {
+                if !word.is_empty() {
+                    word.pop();
                 }
             }
+            // if a letter is pressed, add it to the word
+            if "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(keys[0].to_string().as_str()) {
+                word.push(keys[0].to_string().to_lowercase().chars().nth(0).unwrap());
+                println!("{}", word);
+               
+            }
+            // if LControl + space is pressed, search the word in the dataset
+            if keys.len()>1 && word.len()>3{
+                println!("{:?}", keys);
+                if keys[0].to_string() == "LControl" && keys[1].to_string() == "Space" {
+                    let result = search_partial_dataset(word.as_str(), &dataset, &1);
+                    println!("{:?}", result);
+                    if result.len() > 0 {
+                        println!("{}", result[0].0);
+                        let mut enigo = Enigo::new();
+                        // remove firsts caracters already typed
+                        let mut word_to_type = result[0].0.to_string();
+                        for _ in 0..word.len() {
+                            word_to_type.remove(0);
+                        }
+                       
+                        enigo.key_sequence(&word_to_type);
+                    }
+                }
+            }
+            
+            
         }
+        prev_keys = keys;
     }
 }
+
 
 
 
@@ -102,97 +92,39 @@ fn root_check() {
     }
 }
 
-fn parse_args() {
-    fn print_usage(program: &str, opts: Options) {
-        let brief = format!("Usage: {} [options]", program);
-        println!("{}", opts.usage(&brief));
-    }
-
-    let args: Vec<_> = env::args().collect();
-
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "prints this help message");
-    opts.optflag("v", "version", "prints the version");
-
-
-    let matches = opts.parse(&args[1..]).unwrap_or_else(|e| panic!("{}", e));
-    if matches.opt_present("h") {
-        print_usage(&args[0], opts);
-        exit(0);
-    }
-
-    if matches.opt_present("v") {
-        println!("{}", VERSION);
-        exit(0);
-    }
-
-
-}
-
-fn get_default_device() -> String {
-    let mut filenames = get_keyboard_device_filenames();
-    debug!("Detected devices: {:?}", filenames);
-
-    if filenames.len() == 1 {
-        filenames.swap_remove(0)
-    } else {
-        panic!("The following keyboard devices were detected: {:?}. Please select one using \
-                the `-d` flag", filenames);
-    }
-}
-
-// Detects and returns the name of the keyboard device file. This function uses
-// the fact that all device information is shown in /proc/bus/input/devices and
-// the keyboard device file should always have an EV of 120013
-fn get_keyboard_device_filenames() -> Vec<String> {
-    let mut command_str = "grep -E 'Handlers|EV' /proc/bus/input/devices".to_string();
-    command_str.push_str("| grep -B1 120013");
-    command_str.push_str("| grep -Eo event[0-9]+");
-
-    let res = Command::new("sh").arg("-c").arg(command_str).output().unwrap_or_else(|e| {
-        panic!("{}", e);
-    });
-    let res_str = std::str::from_utf8(&res.stdout).unwrap();
-
-    let mut filenames = Vec::new();
-    for file in res_str.trim().split('\n') {
-        let mut filename = "/dev/input/".to_string();
-        filename.push_str(file);
-        filenames.push(filename);
-    }
-    filenames
-}
-
-fn load_dataset() -> Vec<(String, String)> {
+fn load_dataset() -> Vec<(String, f64)> {
     let mut dataset = Vec::new();
-    let mut reader = csv::Reader::from_path("./Lexique383.csv").unwrap();   
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b';')
+        .from_path("./Lexique383.csv")
+        .unwrap();
     
-    for record in reader.deserialize() {
-        let record: Record = record.unwrap();
-        println!("{:?}", record);
-        // create moyenne frequency with for 1-4 attributs (float)
-        let moyenne_frequency = 0;
-
-        dataset.push((record.ortho, moyenne_frequency.to_string()));
+    for record in reader.records() {
+        let record = record.unwrap();
+        // println!("{:?}", record);
+        let word = record[0].to_string();
+        let freq = record[1].parse::<f64>().unwrap();
+        dataset.push((word, freq));
     }
     dataset
 }
 
-fn search_partial_dataset(partial_word: &str, dataset: &Vec<(String, String)>) -> Vec<String> {
+fn search_partial_dataset(partial_word: &str, dataset: &Vec<(String, f64)>, limit: &i32) -> Vec<(String,f64)> {
     let mut result = Vec::new();
 
-    for (word, _) in dataset {
+    for (word, freq) in dataset {
         if word.starts_with(partial_word) {
-            result.push(word.clone());
+            result.push((word.clone(), freq.clone()));
         }
     }
 
-    // short by moyenne frequency (column 2)
-    result.sort_by(|a, b| {
-        let a_moyenne = a.split(",").nth(2).unwrap().parse::<f32>().unwrap();
-        let b_moyenne = b.split(",").nth(2).unwrap().parse::<f32>().unwrap();
-        a_moyenne.partial_cmp(&b_moyenne).unwrap()
-    });
+    // shot frequence f64
+    result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    // remove duplicates
+    result.dedup_by(|a, b| a.0 == b.0);
+    // limit the result
+    result.truncate(*limit as usize);
 
     result
 
