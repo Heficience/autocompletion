@@ -11,6 +11,9 @@ sudo apt install libx11-dev libxdo-dev -y
 
 ### Contributions
 - andronedev (Créateur)
+<a href="https://github.com/Heficience/autocompletion/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Heficience/autocompletion" />
+</a>
 
 
 ### Remerciements
