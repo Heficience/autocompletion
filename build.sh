@@ -1,5 +1,5 @@
 # build the autocompletion files
+rmdir build/
+mkdir -p build/
 
-mkdir -p build
-
-cargo build --release --bin autocompletion --all-targets --target-dir build
+cargo build --release --bin autocompletion --all-targets --target-dir build/
