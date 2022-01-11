@@ -1,18 +1,15 @@
-extern crate reqwest;
 use std::env;
 use std::process::Command;
 
 use csv;
 use device_query::{DeviceQuery, DeviceState};
 use enigo::{Enigo, KeyboardControllable};
-use libc;
 use std::path::Path;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const KEYBOARD: &'static str = "azerty"; // can be azerty or qwerty
 const ADD_NEW_WORDS: bool = false; // false by default for security reasons (this add all word to the dictionary locally)
 fn main() {
-    root_check();
-    println!("{}", VERSION);
+    logo();
 
     // if dataset is not downloaded, download it
     if dataset_downloaded() == false {
@@ -61,47 +58,24 @@ fn main() {
             if keys.len() > 1 && word.len() > 2 {
                 if keys[0].to_string() == "LControl" && keys[1].to_string() == "Space" {
                     let result = search_partial_dataset(word.as_str(), &dataset, &1);
-                    // while .. (next version)
                     if result.len() > 0 {
-                    println!(
-                        "Results : {}",
-                        result[0].0.split(",").collect::<Vec<&str>>()[0]
-                    );
-                    // remove firsts caracters already typed
-                    let mut word_to_type = result[0].0.to_string();
-                    for _ in 0..word.len() {
-                        word_to_type.remove(0);
-                    }
-                    println!("{}", word_to_type);
-                    // wait for key release
-                    while !device_state.get_keys().is_empty() {}
-                    client_enigo.key_sequence(&word_to_type);
-                    // if Space is pressed, break the loop
-                    // wait for key release
-                    // while !device_state.get_keys().is_empty() {}
-                    // let lastkeys = device_state.get_keys();
+                        println!(
+                            "Results : {}",
+                            result[0].0.split(",").collect::<Vec<&str>>()[0]
+                        );
+                        // remove firsts caracters already typed
+                        let mut word_to_type = result[0].0.to_string();
+                        for _ in 0..word.len() {
+                            word_to_type.remove(0);
+                        }
+                        println!("{}", word_to_type);
+                        // wait for key release
+                        while !device_state.get_keys().is_empty() {}
+                        client_enigo.key_sequence(&word_to_type);
 
-                    // if lastkeys.len() > 1 {
-                    //     if lastkeys[0].to_string() == "LControl"
-                    //         && lastkeys[1].to_string() == "Space"
-                    //     {
-                    //         // wait for key release
-                    //         while !device_state.get_keys().is_empty() {}
-                    //         // remove firsts caracters already typed
-                    //         for _ in 0..word_to_type.len() {
-                    //             client_enigo.key_sequence("Backspace");
-                    //         }
-                    //     } else {
-                    //         break;
-                    //     }
-                    // } else {
-                    //     break;
-                    // }
+                        save_dataset(&dataset);
                     }
-                    // to save the dataset periodically
-                    save_dataset(&dataset);
                 }
-                word.clear();
             }
         }
         prev_keys = keys;
@@ -127,12 +101,7 @@ fn format_to_good_keyboard(key: &str) -> String {
     k
 }
 
-fn root_check() {
-    let euid = unsafe { libc::geteuid() };
-    if euid != 0 {
-        panic!("Must run as root user");
-    }
-}
+
 
 fn add_to_dataset(word: &str, dataset: &Vec<(String, f64)>) -> Vec<(String, f64)> {
     let mut new_dataset = dataset.clone();
@@ -145,7 +114,7 @@ fn add_to_dataset(word: &str, dataset: &Vec<(String, f64)>) -> Vec<(String, f64)
             break;
         }
     }
-    if found == false && ADD_NEW_WORDS{
+    if found == false && ADD_NEW_WORDS {
         new_dataset.push((word.to_string(), 1.0));
     }
     new_dataset
@@ -217,4 +186,15 @@ fn download_file(url: &str, path: &str) {
     if !output.status.success() {
         panic!("{}", String::from_utf8_lossy(&output.stderr));
     }
+}
+
+fn logo() {
+    println!("-----------------------------------------------------");
+    println!(" - Bienvenue sur le programme d'auto-completion de mot");
+    println!(" - Ce programme est en version alpha, il est encore en développement");
+    println!(" - La version actuelle est {}", VERSION);
+    println!(" - Ce programme est développé et maintenu par : @andronedev avec l'equipe Heficience (heficience.com)");
+    println!(" - Github : https://github.com/Heficience/autocompletion");
+    println!("-----------------------------------------------------");
+
 }

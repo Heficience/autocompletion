@@ -1,11 +1,12 @@
 ## AutoCompletion Pour linux
 
-#### Version: `0.0.0` - *En cours de développement. Non disponible pour l'instant.*
+#### Version: `0.1.0-r1` - *En cours de développement*
 
 ### Installation
 ```bash
 # Lib:
 sudo apt install libx11-dev libxdo-dev -y
+
 
 ```
 
