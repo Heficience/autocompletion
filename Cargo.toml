@@ -11,4 +11,3 @@ reqwest = "*"
 csv = "*"
 device_query = "*"
 enigo = "*"
-gtk = { version = "*", package = "gtk4" }

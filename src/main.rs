@@ -1,17 +1,14 @@
 extern crate reqwest;
-use std::process::{Command};
-use std::{env};
+use std::env;
+use std::process::Command;
 
 use device_query::{DeviceQuery, DeviceState};
 
-use libc;
-use std::path::Path;
 use csv;
 use enigo::{Enigo, KeyboardControllable};
+use libc;
+use std::path::Path;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow};
 
 fn main() {
     root_check();
@@ -19,32 +16,26 @@ fn main() {
     // if dataset is not downloaded, download it
     if dataset_downloaded() == false {
         println!("Downloading dataset...");
-        download_file("https://github.com/Heficience/autocompletion/raw/master/Lexique383.csv", "./Lexique383.csv");
+        download_file(
+            "https://github.com/Heficience/autocompletion/raw/master/Lexique383.csv",
+            "./Lexique383.csv",
+        );
     }
-
 
     let dataset = load_dataset();
     println!("Dataset loaded");
     println!("dataset (first 5 words) : {:?}", dataset.get(0..5));
-    println!("dataset search for 'salu' {:?}", search_partial_dataset("salu", &dataset, &10));
-
-    // Create a new application
-    let app = Application::builder()
-    .application_id("com.heficience.autocompletion")
-    .build();
-    // Connect to "activate" signal of `app`
-    app.connect_activate(build_ui);
-    
-    // Run the application
-    app.run();
+    println!(
+        "dataset search for 'salu' {:?}",
+        search_partial_dataset("salu", &dataset, &10)
+    );
 
     let device_state = DeviceState::new();
     let mut prev_keys = vec![];
     let mut word = String::new();
     let mut client_enigo = Enigo::new();
-    
-    loop {
 
+    loop {
         let keys = device_state.get_keys();
         if keys != prev_keys && !keys.is_empty() {
             // if space is pressed, clear the word [Space]
@@ -61,65 +52,43 @@ fn main() {
             if "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(keys[0].to_string().as_str()) {
                 word.push(keys[0].to_string().to_lowercase().chars().nth(0).unwrap());
                 println!("{}", word);
-               
             }
             // if LControl + space is pressed, search the word in the dataset
-            if keys.len()>1 && word.len()>3{
+            if keys.len() > 1 && word.len() > 3 {
                 println!("{:?}", keys);
                 if keys[0].to_string() == "LControl" && keys[1].to_string() == "Space" {
                     let result = search_partial_dataset(word.as_str(), &dataset, &1);
                     println!("{:?}", result);
                     if result.len() > 0 {
                         println!("{}", result[0].0);
-                        
                         // remove firsts caracters already typed
                         let mut word_to_type = result[0].0.to_string();
                         for _ in 0..word.len() {
                             word_to_type.remove(0);
                         }
-                       
                         client_enigo.key_sequence(&word_to_type);
                     }
                 }
             }
-            
-            
         }
         prev_keys = keys;
     }
-}
-
-
-fn build_ui(app: &Application) {
-    // Create a window fixed on the screen
-    let window = ApplicationWindow::new(app);
-    window.set_title(Some("Autocompletion"));
-    window.set_default_size(200, 200);
-    window.set_decorated(false);
-    window.set_child(Some(&gtk::Label::new(Some("Autocompletion"))));
-    window.set_deletable(false);
-    window.present();
-
-
-
- 
 }
 
 fn root_check() {
     let euid = unsafe { libc::geteuid() };
     if euid != 0 {
         panic!("Must run as root user");
-        }
     }
+}
 
-    fn load_dataset() -> Vec<(String, f64)> {
-        let mut dataset = Vec::new();
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .delimiter(b';')
-            .from_path("./Lexique383.csv")
-            .unwrap();
-    
+fn load_dataset() -> Vec<(String, f64)> {
+    let mut dataset = Vec::new();
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b';')
+        .from_path("./Lexique383.csv")
+        .unwrap();
     for record in reader.records() {
         let record = record.unwrap();
         // println!("{:?}", record);
@@ -130,7 +99,11 @@ fn root_check() {
     dataset
 }
 
-fn search_partial_dataset(partial_word: &str, dataset: &Vec<(String, f64)>, limit: &i32) -> Vec<(String,f64)> {
+fn search_partial_dataset(
+    partial_word: &str,
+    dataset: &Vec<(String, f64)>,
+    limit: &i32,
+) -> Vec<(String, f64)> {
     let mut result = Vec::new();
 
     for (word, freq) in dataset {
@@ -147,17 +120,15 @@ fn search_partial_dataset(partial_word: &str, dataset: &Vec<(String, f64)>, limi
     result.truncate(*limit as usize);
 
     result
-
 }
 
-fn dataset_downloaded() -> bool{
+fn dataset_downloaded() -> bool {
     // check if the folder Lexique383 exist
     if Path::new("Lexique383.csv").exists() {
         return true;
-    }else{
+    } else {
         return false;
     }
-
 }
 
 fn download_file(url: &str, path: &str) {
@@ -168,6 +139,4 @@ fn download_file(url: &str, path: &str) {
     if !output.status.success() {
         panic!("{}", String::from_utf8_lossy(&output.stderr));
     }
-
 }
-
