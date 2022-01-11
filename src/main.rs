@@ -9,6 +9,7 @@ use libc;
 use std::path::Path;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const KEYBOARD: &'static str = "azerty"; // can be azerty or qwerty
+const ADD_NEW_WORDS: bool = false; // false by default for security reasons (this add all word to the dictionary locally)
 fn main() {
     root_check();
     println!("{}", VERSION);
@@ -144,7 +145,7 @@ fn add_to_dataset(word: &str, dataset: &Vec<(String, f64)>) -> Vec<(String, f64)
             break;
         }
     }
-    if found == false {
+    if found == false && ADD_NEW_WORDS{
         new_dataset.push((word.to_string(), 1.0));
     }
     new_dataset
