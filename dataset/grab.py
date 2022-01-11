@@ -69,7 +69,7 @@ def main():
         os.remove("../Lexique383.csv")
     except OSError:
         pass
-    shutil.move("Lexique383_final.csv","../Lexique383.csv")
+    shutil.move("Lexique383_final.csv","./Lexique383.csv")
 
 
 

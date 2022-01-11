@@ -2,34 +2,30 @@ extern crate reqwest;
 use std::env;
 use std::process::Command;
 
-use device_query::{DeviceQuery, DeviceState};
-
 use csv;
+use device_query::{DeviceQuery, DeviceState};
 use enigo::{Enigo, KeyboardControllable};
 use libc;
 use std::path::Path;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
+const KEYBOARD: &'static str = "azerty"; // can be azerty or qwerty
 fn main() {
     root_check();
     println!("{}", VERSION);
+
     // if dataset is not downloaded, download it
     if dataset_downloaded() == false {
         println!("Downloading dataset...");
         download_file(
-            "https://github.com/Heficience/autocompletion/raw/master/Lexique383.csv",
-            "./Lexique383.csv",
+            "https://github.com/Heficience/autocompletion/raw/master/dataset/Lexique383.csv",
+            "./dataset.csv",
         );
     }
 
-    let dataset = load_dataset();
+    let mut dataset = load_dataset();
     println!("Dataset loaded");
-    println!("dataset (first 5 words) : {:?}", dataset.get(0..5));
-    println!(
-        "dataset search for 'salu' {:?}",
-        search_partial_dataset("salu", &dataset, &10)
-    );
-
+    println!("dataset count {}", dataset.len());
+    // spawn auto_save_database
     let device_state = DeviceState::new();
     let mut prev_keys = vec![];
     let mut word = String::new();
@@ -38,8 +34,14 @@ fn main() {
     loop {
         let keys = device_state.get_keys();
         if keys != prev_keys && !keys.is_empty() {
+            //println!("{:?}", keys);
+
             // if space is pressed, clear the word [Space]
-            if keys[0].to_string() == "Space" {
+            if keys[0].to_string() == "Space" || keys[0].to_string() == "Enter" {
+                // add the word to the dataset or update it
+                if word.len() > 3 {
+                    dataset = add_to_dataset(&word, &dataset);
+                }
                 word.clear();
             }
             // if backspace is pressed, remove the last char [Backspace]
@@ -49,30 +51,82 @@ fn main() {
                 }
             }
             // if a letter is pressed, add it to the word
-            if "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(keys[0].to_string().as_str()) {
-                word.push(keys[0].to_string().to_lowercase().chars().nth(0).unwrap());
-                println!("{}", word);
+            let k = format_to_good_keyboard(&keys[0].to_string().to_lowercase());
+            if "abcdefghijklmnopqrqstuvwxyz".contains(&k) {
+                word.push(k.chars().nth(0).unwrap());
+                println!("{}\n", word);
             }
             // if LControl + space is pressed, search the word in the dataset
-            if keys.len() > 1 && word.len() > 3 {
-                println!("{:?}", keys);
+            if keys.len() > 1 && word.len() > 2 {
                 if keys[0].to_string() == "LControl" && keys[1].to_string() == "Space" {
-                    let result = search_partial_dataset(word.as_str(), &dataset, &1);
-                    println!("{:?}", result);
-                    if result.len() > 0 {
-                        println!("{}", result[0].0);
-                        // remove firsts caracters already typed
-                        let mut word_to_type = result[0].0.to_string();
-                        for _ in 0..word.len() {
-                            word_to_type.remove(0);
+                    let result = search_partial_dataset(word.as_str(), &dataset, &10);
+                    while result.len() > 0 {
+                        println!("{:?}", result);
+                        if result.len() > 0 {
+                            println!(
+                                "Results : {}",
+                                result[0].0.split(",").collect::<Vec<&str>>()[0]
+                            );
+                            // remove firsts caracters already typed
+                            let mut word_to_type = result[0].0.to_string();
+                            for _ in 0..word.len() {
+                                word_to_type.remove(0);
+                            }
+                            println!("{}", word_to_type);
+                            // wait for key release
+                            while !device_state.get_keys().is_empty() {}
+                            client_enigo.key_sequence(&word_to_type);
+                            // if Space is pressed, break the loop
+                            // wait for key release
+                            while !device_state.get_keys().is_empty() {}
+                            let lastkeys = device_state.get_keys();
+
+                            if lastkeys.len() > 1 {
+                                if lastkeys[0].to_string() == "LControl"
+                                    && lastkeys[1].to_string() == "Space"
+                                {
+                                    // wait for key release
+                                    while !device_state.get_keys().is_empty() {}
+                                    // remove firsts caracters already typed
+                                    for _ in 0..word_to_type.len() {
+                                        client_enigo.key_sequence("Backspace");
+                                    }
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
                         }
-                        client_enigo.key_sequence(&word_to_type);
                     }
+                    // to save the dataset periodically
+                    save_dataset(&dataset);
                 }
+                word.clear();
+                
             }
         }
         prev_keys = keys;
     }
+}
+
+fn format_to_good_keyboard(key: &str) -> String {
+    let mut k = key.to_string();
+    if KEYBOARD == "azerty" {
+        k = match key {
+            "q" => "a".to_string(),
+            "a" => "q".to_string(),
+            "w" => "z".to_string(),
+            "z" => "w".to_string(),
+            "m" => ",".to_string(),
+            "semicolon" => "m".to_string(),
+            ":" => "m".to_string(),
+            ";" => "m".to_string(),
+            "," => "m".to_string(),
+            k => k.to_string(),
+        }
+    } // else, already in qwerty
+    k
 }
 
 fn root_check() {
@@ -82,12 +136,37 @@ fn root_check() {
     }
 }
 
+fn add_to_dataset(word: &str, dataset: &Vec<(String, f64)>) -> Vec<(String, f64)> {
+    let mut new_dataset = dataset.clone();
+
+    let mut found = false;
+    for i in 0..new_dataset.len() {
+        if new_dataset[i].0 == word {
+            new_dataset[i].1 += 0.1;
+            found = true;
+            break;
+        }
+    }
+    if found == false {
+        new_dataset.push((word.to_string(), 1.0));
+    }
+    new_dataset
+}
+fn save_dataset(dataset: &Vec<(String, f64)>) {
+    println!("Saving dataset...");
+    let mut file = csv::Writer::from_path("dataset.csv").unwrap();
+    for i in 0..dataset.len() {
+        file.write_record([&dataset[i].0, &dataset[i].1.to_string()]).unwrap();
+    }
+    println!("Dataset saved");
+}
+
 fn load_dataset() -> Vec<(String, f64)> {
     let mut dataset = Vec::new();
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
         .delimiter(b';')
-        .from_path("./Lexique383.csv")
+        .from_path("./dataset.csv")
         .unwrap();
     for record in reader.records() {
         let record = record.unwrap();
@@ -123,8 +202,8 @@ fn search_partial_dataset(
 }
 
 fn dataset_downloaded() -> bool {
-    // check if the folder Lexique383 exist
-    if Path::new("Lexique383.csv").exists() {
+    // check if the folder dataset exist
+    if Path::new("dataset.csv").exists() {
         return true;
     } else {
         return false;
