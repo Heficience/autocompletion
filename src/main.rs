@@ -1,20 +1,20 @@
-extern crate getopts;
-extern crate env_logger;
-extern crate libc;
 extern crate reqwest;
-extern crate log;
 use std::process::{Command};
 use std::{env};
 
 use device_query::{DeviceQuery, DeviceState};
 
-
+use libc;
 use std::path::Path;
 use csv;
 use enigo::{Enigo, KeyboardControllable};
-
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
+use gtk::prelude::*;
+use gtk::{Application, ApplicationWindow};
+use gtk::gdk;
+use gtk::prelude::*;
+use gdk::WindowState;
 
 fn main() {
     root_check();
@@ -30,6 +30,17 @@ fn main() {
     println!("Dataset loaded");
     println!("dataset (first 5 words) : {:?}", dataset.get(0..5));
     println!("dataset search for 'salu' {:?}", search_partial_dataset("salu", &dataset, &10));
+
+    // Create a new application
+    let app = Application::builder()
+    .application_id("com.heficience.autocompletion")
+    .build();
+
+    // Connect to "activate" signal of `app`
+    app.connect_activate(build_ui);
+    
+    // Run the application
+    app.run();
 
     let device_state = DeviceState::new();
     let mut prev_keys = vec![];
@@ -64,14 +75,14 @@ fn main() {
                     println!("{:?}", result);
                     if result.len() > 0 {
                         println!("{}", result[0].0);
-                        let mut enigo = Enigo::new();
+                        
                         // remove firsts caracters already typed
                         let mut word_to_type = result[0].0.to_string();
                         for _ in 0..word.len() {
                             word_to_type.remove(0);
                         }
                        
-                        enigo.key_sequence(&word_to_type);
+                        client_enigo.key_sequence(&word_to_type);
                     }
                 }
             }
@@ -83,22 +94,44 @@ fn main() {
 }
 
 
+fn build_ui(app: &Application) {
+    // Create a window and set the title
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("AutoCompletion")
+        .child(&gtk::Label::new(Some("Hello World!")))
+        .height_request(200)
+        .build();
+    
+    // Present window
+    window.set_decorated(false);
+    window.set_modal(true);
+    window.set_default_height(100);
+    window.set_opacity(0.8);
 
+    // set position of the window 
+    // set in top left corner
+    window.set(gdk::WindowState::STATE_MAXIMIZED);
+
+    window.present();
+
+ 
+}
 
 fn root_check() {
     let euid = unsafe { libc::geteuid() };
     if euid != 0 {
         panic!("Must run as root user");
+        }
     }
-}
 
-fn load_dataset() -> Vec<(String, f64)> {
-    let mut dataset = Vec::new();
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .delimiter(b';')
-        .from_path("./Lexique383.csv")
-        .unwrap();
+    fn load_dataset() -> Vec<(String, f64)> {
+        let mut dataset = Vec::new();
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .delimiter(b';')
+            .from_path("./Lexique383.csv")
+            .unwrap();
     
     for record in reader.records() {
         let record = record.unwrap();
