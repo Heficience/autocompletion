@@ -28,7 +28,7 @@ def parse_tsv_to_csv():
         tsv_reader = csv.reader(tsv_file, delimiter="\t")
         next(tsv_reader) # remove first line 
         with open("Lexique383.csv", "w", encoding="utf-8") as csv_file:
-            csv_writer = csv.writer(csv_file, delimiter=";")
+            csv_writer = csv.writer(csv_file, delimiter=",")
             for row in tsv_reader:
                 csv_writer.writerow(row)
 
@@ -37,9 +37,9 @@ def parse_csv():
     Keep only the first column of the CSV file
     """
     with open("Lexique383.csv", "r", encoding="utf-8") as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=";")
+        csv_reader = csv.reader(csv_file, delimiter=",")
         with open("Lexique383_final.csv", "w", encoding="utf-8") as csv_file:
-            csv_writer = csv.writer(csv_file, delimiter=";")
+            csv_writer = csv.writer(csv_file, delimiter=",")
             for row in csv_reader:
                 # calculate the moyenne of 2,3,4,5 columns
                 moyenne = (float(row[6]) + float(row[7]) + float(row[8]) + float(row[9])) / 4

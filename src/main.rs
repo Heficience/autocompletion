@@ -54,56 +54,53 @@ fn main() {
             let k = format_to_good_keyboard(&keys[0].to_string().to_lowercase());
             if "abcdefghijklmnopqrqstuvwxyz".contains(&k) {
                 word.push(k.chars().nth(0).unwrap());
-                println!("{}\n", word);
+                //println!("{}\n", word);
             }
             // if LControl + space is pressed, search the word in the dataset
             if keys.len() > 1 && word.len() > 2 {
                 if keys[0].to_string() == "LControl" && keys[1].to_string() == "Space" {
-                    let result = search_partial_dataset(word.as_str(), &dataset, &10);
-                    while result.len() > 0 {
-                        println!("{:?}", result);
-                        if result.len() > 0 {
-                            println!(
-                                "Results : {}",
-                                result[0].0.split(",").collect::<Vec<&str>>()[0]
-                            );
-                            // remove firsts caracters already typed
-                            let mut word_to_type = result[0].0.to_string();
-                            for _ in 0..word.len() {
-                                word_to_type.remove(0);
-                            }
-                            println!("{}", word_to_type);
-                            // wait for key release
-                            while !device_state.get_keys().is_empty() {}
-                            client_enigo.key_sequence(&word_to_type);
-                            // if Space is pressed, break the loop
-                            // wait for key release
-                            while !device_state.get_keys().is_empty() {}
-                            let lastkeys = device_state.get_keys();
+                    let result = search_partial_dataset(word.as_str(), &dataset, &1);
+                    // while .. (next version)
+                    if result.len() > 0 {
+                    println!(
+                        "Results : {}",
+                        result[0].0.split(",").collect::<Vec<&str>>()[0]
+                    );
+                    // remove firsts caracters already typed
+                    let mut word_to_type = result[0].0.to_string();
+                    for _ in 0..word.len() {
+                        word_to_type.remove(0);
+                    }
+                    println!("{}", word_to_type);
+                    // wait for key release
+                    while !device_state.get_keys().is_empty() {}
+                    client_enigo.key_sequence(&word_to_type);
+                    // if Space is pressed, break the loop
+                    // wait for key release
+                    // while !device_state.get_keys().is_empty() {}
+                    // let lastkeys = device_state.get_keys();
 
-                            if lastkeys.len() > 1 {
-                                if lastkeys[0].to_string() == "LControl"
-                                    && lastkeys[1].to_string() == "Space"
-                                {
-                                    // wait for key release
-                                    while !device_state.get_keys().is_empty() {}
-                                    // remove firsts caracters already typed
-                                    for _ in 0..word_to_type.len() {
-                                        client_enigo.key_sequence("Backspace");
-                                    }
-                                } else {
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
-                        }
+                    // if lastkeys.len() > 1 {
+                    //     if lastkeys[0].to_string() == "LControl"
+                    //         && lastkeys[1].to_string() == "Space"
+                    //     {
+                    //         // wait for key release
+                    //         while !device_state.get_keys().is_empty() {}
+                    //         // remove firsts caracters already typed
+                    //         for _ in 0..word_to_type.len() {
+                    //             client_enigo.key_sequence("Backspace");
+                    //         }
+                    //     } else {
+                    //         break;
+                    //     }
+                    // } else {
+                    //     break;
+                    // }
                     }
                     // to save the dataset periodically
                     save_dataset(&dataset);
                 }
                 word.clear();
-                
             }
         }
         prev_keys = keys;
@@ -154,9 +151,10 @@ fn add_to_dataset(word: &str, dataset: &Vec<(String, f64)>) -> Vec<(String, f64)
 }
 fn save_dataset(dataset: &Vec<(String, f64)>) {
     println!("Saving dataset...");
-    let mut file = csv::Writer::from_path("dataset.csv").unwrap();
+    let mut file = csv::Writer::from_path("./dataset.csv").unwrap();
     for i in 0..dataset.len() {
-        file.write_record([&dataset[i].0, &dataset[i].1.to_string()]).unwrap();
+        file.write_record([&dataset[i].0, &dataset[i].1.to_string()])
+            .unwrap();
     }
     println!("Dataset saved");
 }
@@ -165,7 +163,7 @@ fn load_dataset() -> Vec<(String, f64)> {
     let mut dataset = Vec::new();
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
-        .delimiter(b';')
+        .delimiter(b',')
         .from_path("./dataset.csv")
         .unwrap();
     for record in reader.records() {
