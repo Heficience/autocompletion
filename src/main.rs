@@ -12,9 +12,6 @@ const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
-use gtk::gdk;
-use gtk::prelude::*;
-use gdk::WindowState;
 
 fn main() {
     root_check();
@@ -35,7 +32,6 @@ fn main() {
     let app = Application::builder()
     .application_id("com.heficience.autocompletion")
     .build();
-
     // Connect to "activate" signal of `app`
     app.connect_activate(build_ui);
     
@@ -95,25 +91,16 @@ fn main() {
 
 
 fn build_ui(app: &Application) {
-    // Create a window and set the title
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("AutoCompletion")
-        .child(&gtk::Label::new(Some("Hello World!")))
-        .height_request(200)
-        .build();
-    
-    // Present window
+    // Create a window fixed on the screen
+    let window = ApplicationWindow::new(app);
+    window.set_title(Some("Autocompletion"));
+    window.set_default_size(200, 200);
     window.set_decorated(false);
-    window.set_modal(true);
-    window.set_default_height(100);
-    window.set_opacity(0.8);
-
-    // set position of the window 
-    // set in top left corner
-    window.set(gdk::WindowState::STATE_MAXIMIZED);
-
+    window.set_child(Some(&gtk::Label::new(Some("Autocompletion"))));
+    window.set_deletable(false);
     window.present();
+
+
 
  
 }

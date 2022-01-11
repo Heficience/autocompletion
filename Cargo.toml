@@ -12,4 +12,3 @@ csv = "*"
 device_query = "*"
 enigo = "*"
 gtk = { version = "*", package = "gtk4" }
-gtk-sys = "0.14.0"
