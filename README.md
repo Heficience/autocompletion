@@ -4,14 +4,7 @@
 
 ### Installation
 ```bash
-# Lib:
-sudo apt install libx11-dev libxdo-dev -y
-wget https://github.com/Heficience/autocompletion/releases/download/0.1.0-dev.1/autocompletion
-
-chmod +x autocompletion
-
-./autocompletion
-
+curl https://raw.githubusercontent.com/Heficience/autocompletion/master/install.sh | sh
 ```
 
 ### Contributions
