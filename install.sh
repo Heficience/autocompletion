@@ -7,6 +7,7 @@ echo "Removing old autocompletion.."
 sudo rm -f /usr/bin/autocompletion
 rm -rf ~/.autocompletion/
 echo "Installing autocompletion.."
+mkdir ~/.autocompletion/
 mv autocompletion_linux ~/.autocompletion/autocompletion
 chmod +x ~/.autocompletion/autocompletion
 # create a symbolic link in /usr/bin
