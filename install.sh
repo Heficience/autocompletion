@@ -1,3 +1,4 @@
+#!/bin/bash
 echo "AUTOCOMPLETION INSTALLATION"
 echo "=========================="
 echo "heficience.com"
